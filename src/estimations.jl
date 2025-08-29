@@ -1,15 +1,15 @@
 
 function sdid(
-  data, Y_col::Union{String, Symbol}, S_col::Union{String, Symbol}, 
-  T_col::Union{String, Symbol}, D_col::Union{String, Symbol};
-  covariates::Union{Vector{String}, Vector{Symbol}, Nothing} = nothing, 
-  cov_method = "optimized", noise_level::Union{Float64, Nothing} = nothing, 
-  eta_omega::Union{Float64, Nothing} = nothing, eta_lambda::Union{Float64, Nothing} = 1e-6,
-  zeta_omega::Union{Float64, Nothing} = nothing, zeta_lambda::Union{Float64, Nothing} = nothing, 
-  omega_intercept::Bool = true, lambda_intercept::Bool = true,
-  min_decrease::Union{Float64, Nothing} = nothing, max_iter::Int = 10000,
-  sparsify::Union{Function, Nothing} = sparsify_function, 
-  max_iter_pre_sparsify::Int = 100, vce = "placebo"
+  data, Y_col::Union{String,Symbol}, S_col::Union{String,Symbol},
+  T_col::Union{String,Symbol}, D_col::Union{String,Symbol};
+  covariates::Union{Vector{String},Vector{Symbol},Nothing}=nothing,
+  cov_method="optimized", noise_level::Union{Float64,Nothing}=nothing,
+  eta_omega::Union{Float64,Nothing}=nothing, eta_lambda::Union{Float64,Nothing}=1e-6,
+  zeta_omega::Union{Float64,Nothing}=nothing, zeta_lambda::Union{Float64,Nothing}=nothing,
+  omega_intercept::Bool=true, lambda_intercept::Bool=true,
+  min_decrease::Union{Float64,Nothing}=nothing, max_iter::Int=10000,
+  sparsify::Union{Function,Nothing}=sparsify_function,
+  max_iter_pre_sparsify::Int=100, vce="placebo"
 )
 
   att = Float64[]
@@ -26,12 +26,12 @@ function sdid(
     tdf = data_setup(data, S_col, T_col, D_col)
   end
 
-  t_span = collect(minimum(data[:, T_col]): maximum(data[:, T_col]))
+  t_span = collect(minimum(data[:, T_col]):maximum(data[:, T_col]))
   tyears = sort(unique(tdf.tyear)[.!isnothing.(unique(tdf.tyear))])
   T_total = sum(Matrix(unstack(tdf, S_col, T_col, D_col)[:, 2:end]))
   units = unique(tdf[:, S_col])
   N_out = size(units, 1)
-  N0_out = size(unique(tdf[tdf.tunit .== 0, S_col]), 1)
+  N0_out = size(unique(tdf[tdf.tunit.==0, S_col]), 1)
   T0_out = DataFrame()
 
   tdf_ori = copy(tdf)
@@ -42,7 +42,9 @@ function sdid(
   Y_out = Dict()
   info_beta = nothing
 
-  if isnothing(covariates) cov_method = nothing end
+  if isnothing(covariates)
+    cov_method = nothing
+  end
   X_out = nothing
 
   # project covariates method
@@ -64,7 +66,7 @@ function sdid(
     for year in tyears
       info = []
       df_y = tdf[in.(tdf.tyear, Ref([year, nothing])), [Y_col, S_col, T_col, :tunit]]
-      N1 = size(unique(df_y[df_y.tunit .== 1, S_col]), 1)
+      N1 = size(unique(df_y[df_y.tunit.==1, S_col]), 1)
       T1 = maximum(data[:, T_col]) - year + 1
       T_post = N1 * T1
 
@@ -77,7 +79,7 @@ function sdid(
       Yc = collapse_form(Y, N0, T0)
 
       # calculate penalty parameters
-      noise_level = std(diff(Y[1:N0, 1:T0], dims = 2)) # gotta fix this, probably its own function
+      noise_level = std(diff(Y[1:N0, 1:T0], dims=2)) # gotta fix this, probably its own function
       eta_omega = ((size(Y, 1) - N0) * (size(Y, 2) - T0))^(1 / 4)
       eta_lambda = 1e-6
       zeta_omega = eta_omega * noise_level
@@ -86,20 +88,20 @@ function sdid(
 
       # calculate lambda
       lambda_opt = sc_weight_fw(
-        Yc[1:N0, 1:T0], Yc[1:N0, end], nothing, 
-        intercept = lambda_intercept, 
-        zeta = zeta_lambda, 
-        min_decrease = min_decrease, 
-        max_iter = max_iter_pre_sparsify
+        Yc[1:N0, 1:T0], Yc[1:N0, end], nothing,
+        intercept=lambda_intercept,
+        zeta=zeta_lambda,
+        min_decrease=min_decrease,
+        max_iter=max_iter_pre_sparsify
       )
-      
+
       if !isnothing(sparsify)
         lambda_opt = sc_weight_fw(
-          Yc[1:N0, 1:T0], Yc[1:N0, end], sparsify(lambda_opt["params"]), 
-          intercept = lambda_intercept, 
-          zeta = zeta_lambda, 
-          min_decrease = min_decrease, 
-          max_iter = max_iter
+          Yc[1:N0, 1:T0], Yc[1:N0, end], sparsify(lambda_opt["params"]),
+          intercept=lambda_intercept,
+          zeta=zeta_lambda,
+          min_decrease=min_decrease,
+          max_iter=max_iter
         )
       end
 
@@ -107,27 +109,27 @@ function sdid(
 
       # calculate omega
       omega_opt = sc_weight_fw(
-        Yc'[1:T0, 1:N0], Yc[end, 1:T0], nothing, 
-        intercept = omega_intercept, 
-        zeta = zeta_omega, 
-        min_decrease = min_decrease, 
-        max_iter = max_iter_pre_sparsify
+        Yc'[1:T0, 1:N0], Yc[end, 1:T0], nothing,
+        intercept=omega_intercept,
+        zeta=zeta_omega,
+        min_decrease=min_decrease,
+        max_iter=max_iter_pre_sparsify
       )
-      
+
       if !isnothing(sparsify)
         omega_opt = sc_weight_fw(
-          Yc'[1:T0, 1:N0], Yc[end, 1:T0], sparsify(omega_opt["params"]), 
-          intercept = omega_intercept, 
-          zeta = zeta_omega, 
-          min_decrease = min_decrease, 
-          max_iter = max_iter
+          Yc'[1:T0, 1:N0], Yc[end, 1:T0], sparsify(omega_opt["params"]),
+          intercept=omega_intercept,
+          zeta=zeta_omega,
+          min_decrease=min_decrease,
+          max_iter=max_iter
         )
       end
 
       omega = omega_opt["params"]
 
       # calculate tau for this a
-      tau_hat = [-omega; fill(1/N1, N1)]' * Y * [-lambda; fill(1/T1, T1)]
+      tau_hat = [-omega; fill(1 / N1, N1)]' * Y * [-lambda; fill(1 / T1, T1)]
       tau_w = T_post / T_total * tau_hat
       att = [att; tau_w]
       info = [year tau_hat tau_w N0 T0 N1 T1]
@@ -137,7 +139,7 @@ function sdid(
       year_weights["lambda"][string(year)] = lambda
       Y_out[string(year)] = Y
     end
-    
+
     year_weights["beta"] = info_beta
     att = sum(att)
   end
@@ -153,7 +155,7 @@ function sdid(
     for year in tyears
       info = []
       df_y = tdf[in.(tdf.tyear, Ref([year, nothing])), [[Y_col, S_col, T_col, :tunit]; covariates]]
-      N1 = size(unique(df_y[df_y.tunit .== 1, S_col]), 1)
+      N1 = size(unique(df_y[df_y.tunit.==1, S_col]), 1)
       T1 = maximum(data[:, T_col]) - year + 1
       T_post = N1 * T1
 
@@ -166,8 +168,8 @@ function sdid(
       T0_out[:, string(year)] = [T0]
       Yc = collapse_form(Y, N0, T0)
 
-        # create penalty parameters
-      noise_level = std(diff(Y[1:N0, 1:T0], dims = 2)) # this needs fixed, maybe in its own function
+      # create penalty parameters
+      noise_level = std(diff(Y[1:N0, 1:T0], dims=2)) # this needs fixed, maybe in its own function
       eta_omega = ((size(Y, 1) - N0) * (size(Y, 2) - T0))^(1 / 4)
       eta_lambda = 1e-6
       zeta_omega = eta_omega * noise_level
@@ -182,18 +184,18 @@ function sdid(
       end
 
       Xc = collapse_form.(X, N0, T0)
-      
+
       # find lambda, omega, and beta for Yc with X
       weights = sc_weight_covariates(
-        Yc, Xc, zeta_lambda = zeta_lambda, zeta_omega = zeta_omega, 
-        lambda_intercept = lambda_intercept, omega_intercept = omega_intercept, 
-        min_decrease = min_decrease, max_iter = max_iter, lambda = nothing, 
-        omega = nothing
+        Yc, Xc, zeta_lambda=zeta_lambda, zeta_omega=zeta_omega,
+        lambda_intercept=lambda_intercept, omega_intercept=omega_intercept,
+        min_decrease=min_decrease, max_iter=max_iter, lambda=nothing,
+        omega=nothing
       )
 
       # calculate tau for this a
       X_beta = sum(weights["beta"] .* X)
-      tau_hat = [-weights["omega"]; fill(1/N1, N1)]' * (Y - X_beta) * [-weights["lambda"]; fill(1/T1, T1)]
+      tau_hat = [-weights["omega"]; fill(1 / N1, N1)]' * (Y - X_beta) * [-weights["lambda"]; fill(1 / T1, T1)]
       tau_w = T_post / T_total * tau_hat
       att = [att; tau_w]
 
@@ -207,16 +209,16 @@ function sdid(
       X_out[string(year)] = X
       push!(info_beta, [year; weights["beta"]])
     end
-    
+
     # weighed average of tau
     att = sum(att)
   end
-  
+
   # prepare output
   out = Dict(
     "att" => att, "year_params" => year_params, "T" => T_out, "N" => N_out, "N0" => N0_out, "T0" => T0_out,
-    "data" => data, "proc_data" => tdf_ori, "tyears" => tyears, "weights" => year_weights, 
-    "Y" => Y_out, "units" => units, "t_span" => t_span, "covariates" => covariates, "cov_method" => cov_method, 
+    "data" => data, "proc_data" => tdf_ori, "tyears" => tyears, "weights" => year_weights,
+    "Y" => Y_out, "units" => units, "t_span" => t_span, "covariates" => covariates, "cov_method" => cov_method,
     "X" => X_out, "beta" => info_beta
   )
 
